@@ -39,3 +39,11 @@ def edit_room(request, room_id):
             return redirect('/')
     payload={'form':form}
     return render(request, 'base/room_form.html', payload)
+
+def delete_room(request, room_id):
+    room = Room.objects.get(id=room_id)
+    if request.method == "POST":
+        room.delete()
+        return redirect('/')
+
+    return render(request, 'base/delete.html',{'obj':room.name})
