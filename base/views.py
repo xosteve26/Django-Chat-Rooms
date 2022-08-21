@@ -78,7 +78,17 @@ def home(request):
 def room(request, room_id):
     room=Room.objects.get(id=room_id)
     roomMessages=Message.objects.filter(room=room).order_by('-created')
-    payload={'room':room, 'roomMessages':roomMessages}
+    participants=room.participants.all()
+    print(participants)
+    if request.method == "POST":
+        message=Message.objects.create(
+            user=request.user,
+            room=room,
+            body=request.POST.get('body')
+        )
+        return redirect('room',room_id=room.id)
+
+    payload={'room':room, 'roomMessages':roomMessages, 'participants':participants}
     return render(request, 'base/room.html', payload)
 
 @login_required(login_url='/login')
