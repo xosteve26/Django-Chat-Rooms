@@ -3,7 +3,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.contrib.auth import authenticate, login, logout
-from .models import Room, Topic, User
+from django.contrib.auth.forms import UserCreationForm
+from .models import Room, Topic, User, Message
 from .forms import RoomForm
 from django.db.models import Q
 # Create your views here.
@@ -11,8 +12,12 @@ from django.db.models import Q
 rooms=None
 
 def login_page(request):
+    page='login'
+    if request.user.is_authenticated:
+        return redirect('/')
+
     if request.method == "POST":
-        username=request.POST.get('username')
+        username=request.POST.get('username').lower()
         password=request.POST.get('password')
 
         try:
@@ -28,8 +33,30 @@ def login_page(request):
         else:
             messages.error(request,'Invalid credentials')
             return redirect('/login')
+    payload={'page':page}
+    return render(request, 'base/login_register.html',payload)
 
-    return render(request, 'base/login_register.html')
+def register_page(request):
+
+    if request.user.is_authenticated:
+        return redirect('/')
+
+    if request.method == "POST":
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user=form.save(commit=False)
+            user.username=user.username.lower()
+            user.save()
+            messages.success(request,'User created successfully')
+            login(request, user)
+            return redirect('/')
+        else:
+            messages.error(request,'Invalid credentials')
+            return redirect('/register')
+
+    form=UserCreationForm()  
+    payload = {'form':form}
+    return render(request, 'base/login_register.html', payload)
 
 def home(request):
     params=request.GET.get('q')
@@ -50,7 +77,8 @@ def home(request):
 
 def room(request, room_id):
     room=Room.objects.get(id=room_id)
-    payload={'room':room}
+    roomMessages=Message.objects.filter(room=room).order_by('-created')
+    payload={'room':room, 'roomMessages':roomMessages}
     return render(request, 'base/room.html', payload)
 
 @login_required(login_url='/login')
@@ -69,6 +97,10 @@ def create_room(request):
 def edit_room(request, room_id):
     room=Room.objects.get(id=room_id)
     form=RoomForm(instance=room)
+
+    if request.user != room.host:
+        return HttpResponse('You are not authorized to edit this room')
+
     if request.method == 'POST':
         form=RoomForm(request.POST, instance=room)
         if form.is_valid():
@@ -81,6 +113,9 @@ def edit_room(request, room_id):
 @login_required(login_url='/login')
 def delete_room(request, room_id):
     room = Room.objects.get(id=room_id)
+    if request.user != room.host:
+        return HttpResponse('You are not authorized to edit this room')
+
     if request.method == "POST":
         room.delete()
         return redirect('/')
