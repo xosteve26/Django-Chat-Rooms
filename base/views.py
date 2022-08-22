@@ -76,16 +76,19 @@ def home(request):
 
 
 def room(request, room_id):
+    
     room=Room.objects.get(id=room_id)
     roomMessages=Message.objects.filter(room=room).order_by('-created')
     participants=room.participants.all()
-    print(participants)
+
     if request.method == "POST":
         message=Message.objects.create(
             user=request.user,
             room=room,
             body=request.POST.get('body')
         )
+        room.participants.add(request.user)
+        print(room.participants)
         return redirect('room',room_id=room.id)
 
     payload={'room':room, 'roomMessages':roomMessages, 'participants':participants}
@@ -131,6 +134,19 @@ def delete_room(request, room_id):
         return redirect('/')
 
     return render(request, 'base/delete.html',{'obj':room.name})
+
+@login_required(login_url='/login')
+def delete_message(request, message_id):
+    message = Message.objects.get(id=message_id)
+    
+    if request.user != message.user:
+        return HttpResponse('You are not authorized to delete this message')
+
+    if request.method == "POST":
+        message.delete()
+        return redirect('/')
+
+    return render(request, 'base/delete.html',{'obj':message.body})
 
 def logout_page(request):
     logout(request)
